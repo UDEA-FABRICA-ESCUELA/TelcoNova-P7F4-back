@@ -41,16 +41,16 @@ jobs:
         run: mvn test
         env:
           # BD en memoria para tests
-          URL_DATA_BASE: ${{ secrets.URL_DATA_BASE }}
-          USER_NAME_DATA_BASE: ${{ secrets.USER_NAME_DATA_BASE }}
-          PASSWORD_DATA_BASE: ${{ secrets.PASSWORD_DATA_BASE }}
+          URL_DATA_BASE: jdbc:h2:mem:testdb
+          USER_NAME_DATA_BASE: sa
+          PASSWORD_DATA_BASE: ""
 
       - name: Run integration tests
         run: mvn verify -DskipUnitTests=true
         env:
-          URL_DATA_BASE: ${{ secrets.URL_DATA_BASE }}
-          USER_NAME_DATA_BASE: ${{ secrets.USER_NAME_DATA_BASE }}
-          PASSWORD_DATA_BASE: ${{ secrets.PASSWORD_DATA_BASE }}
+          URL_DATA_BASE: jdbc:h2:mem:testdb
+          USER_NAME_DATA_BASE: sa
+          PASSWORD_DATA_BASE: ""
 
       - name: Code quality analysis (optional)
         run: mvn checkstyle:check || echo "Checkstyle not configured"
