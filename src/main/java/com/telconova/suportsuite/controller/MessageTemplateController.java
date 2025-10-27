@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "https://telco-nova-p7-f4-front.vercel.app")
 @RestController
 @RequestMapping("/api/v1/templates")
 public class MessageTemplateController {
