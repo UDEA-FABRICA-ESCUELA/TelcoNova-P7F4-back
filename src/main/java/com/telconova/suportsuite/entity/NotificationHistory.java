@@ -2,38 +2,43 @@ package com.telconova.suportsuite.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import org.springframework.boot.autoconfigure.web.WebProperties;
-import org.springframework.cglib.core.Local;
+// CORRECCIÓN 1: Se eliminaron las importaciones innecesarias que causaban errores
+// import org.springframework.boot.autoconfigure.web.WebProperties;
+// import org.springframework.cglib.core.Local;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Data
 @Table(name = "notification_history")
-
 public class NotificationHistory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) //Indica a la base de datos que genere automáticamente el ID (auto-incrementable).
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY) // Define la relación Many-to-One. FetchType.LAZY asegura que la 'AlertRule' solo se cargue de la DB cuando se acceda a ella (optimización).
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "notification_id", nullable = false)
     private Notification notification;
 
-    @Enumerated(EnumType.STRING) //Indica que el enum debe persistirse en la base de datos como una cadena de texto (ej. "EMAIL")
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private NotificationStatus status;
+
+    private Notification.NotificationStatus status;
 
     @Column(columnDefinition = "TEXT")
-    private String menssage; // Descripción
+
+    private String description;
+
+    @Column(columnDefinition = "TEXT")
+
+    private String errorDetails;
 
     @Column (name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 
-    @PrePersist // Se ejecuta justo antes de guardar la entidad por primera vez. Establece la fecha y hora de creación automática.
+    @PrePersist
     protected void onCreate(){
         timestamp = LocalDateTime.now();
     }
-
 }

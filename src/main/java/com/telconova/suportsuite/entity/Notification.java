@@ -1,129 +1,71 @@
 package com.telconova.suportsuite.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDateTime;
+import com.telconova.suportsuite.entity.NotificationChannel;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper = false)
 @Entity
 @Table(name ="notifications")
 public class Notification {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column (nullable = false)
-    private String message;
-
     @Column(nullable = false)
     private String recipient;
 
+    @Column(nullable = false)
+    private String subject;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;
+
+
+    @Column(nullable = false)
+    private Integer priority = 5;
+
+    @Column(name = "reintentos_count", nullable = false)
+    private Integer reintentosCount = 0;
+
+    @Column (name = "max_reintentos", nullable = false)
+    private Integer maxReintentos = 3;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "sent_at") // Fecha de envío
+    private LocalDateTime sentAt;
+
+
+    // El Enum NotificationChannel DEBE estar definido como una clase independiente
     @Enumerated (EnumType.STRING)
     private NotificationChannel channel;
 
     @Enumerated (EnumType.STRING)
-    private NotificationStatus status;
 
-
-
-    @Column (name = "reintentos_count")
-    private Integer maxReintentos = 3;
+    private NotificationStatus status = NotificationStatus.PENDIENTE;
 
     @Column (name = "error_menssage" )
     private String errorMenssage;
 
     @ManyToOne
     @JoinColumn(name = "alert_rule_id")
-    private  AlertRule alertRule;
+    //private AlertRule alertRule;
 
-    public Notification() {
-
-    }
-
-    public Notification(Long id, String message, String recipient, NotificationChannel channel, NotificationStatus status, Integer maxReintentos, String errorMenssage, AlertRule alertRule) {
-        this.id = id;
-        this.message = message;
-        this.recipient = recipient;
-        this.channel = channel;
-        this.status = status;
-        this.maxReintentos = maxReintentos;
-        this.errorMenssage = errorMenssage;
-        this.alertRule = alertRule;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public String getRecipient() {
-        return recipient;
-    }
-
-    public void setRecipient(String recipient) {
-        this.recipient = recipient;
-    }
-
-    public NotificationChannel getChannel() {
-        return channel;
-    }
-
-    public void setChannel(NotificationChannel channel) {
-        this.channel = channel;
-    }
-
-    public NotificationStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(NotificationStatus status) {
-        this.status = status;
-    }
-
-    public Integer getMaxReintentos() {
-        return maxReintentos;
-    }
-
-    public void setMaxReintentos(Integer maxReintentos) {
-        this.maxReintentos = maxReintentos;
-    }
-
-    public String getErrorMenssage() {
-        return errorMenssage;
-    }
-
-    public void setErrorMenssage(String errorMenssage) {
-        this.errorMenssage = errorMenssage;
-    }
-
-    public AlertRule getAlertRule() {
-        return alertRule;
-    }
-
-    public void setAlertRule(AlertRule alertRule) {
-        this.alertRule = alertRule;
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
     }
 
     public enum NotificationStatus{
-        PENDING,
-        PROCESSING,
-        SENT,
-        FAILD
-
+        PENDIENTE, PROCESANDO, ENVIADO, FALLIDA, REINTENTANDO
     }
-    public enum NotificationChannel{
-        EMAIL,
-        SMS,
-        WHATSAPP,
-        PUSH
 
-    }
 }
