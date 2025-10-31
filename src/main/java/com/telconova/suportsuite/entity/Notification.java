@@ -57,7 +57,7 @@ public class Notification {
 
     @ManyToOne
     @JoinColumn(name = "alert_rule_id")
-    //private AlertRule alertRule;
+    private AlertRule alertRule;
 
     @PrePersist
     protected void onCreate() {
