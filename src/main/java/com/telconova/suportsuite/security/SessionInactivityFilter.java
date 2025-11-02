@@ -4,35 +4,42 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.security.core.context.SecurityContextHolder; // Importación necesaria
 
 import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Filtro de Inactividad de Sesión que utiliza un servicio de revocación en memoria
+ * para bloquear tokens inactivos y el problema del "segundo intento".
+ */
 @Component
 public class SessionInactivityFilter extends OncePerRequestFilter {
 
+    // INYECCIÓN DEL SERVICIO DE REVOCACIÓN
+    @Autowired
+    private TokenRevocationService tokenRevocationService;
+
+    // Mapa para rastrear el último acceso (solo para medir la inactividad)
     private final ConcurrentHashMap<String, LocalDateTime> lastAccessMap = new ConcurrentHashMap<>();
 
     @Value("${session.inactivity.minutes:15}")
     private long inactivityMinutes;
 
-    // Lista de rutas que el filtro debe ignorar (ej: /login, /auth, /public)
-    // Aunque se recomienda configurar esto en la cadena de seguridad,
-    // lo hacemos aquí por si el filtro se aplica a todas las rutas.
+    // Ruta de autenticación para excluir
     private static final String AUTH_PATH = "/api/v1/auth/login";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // --- VERIFICACIÓN DE EXCLUSIÓN ---
-        // Excluir la ruta de login para que la autenticación inicial no se bloquee.
+        // 1. VERIFICACIÓN DE EXCLUSIÓN (Salta el filtro si es la petición de login)
         if (request.getServletPath().equals(AUTH_PATH) || request.getServletPath().equals("/login")) {
             filterChain.doFilter(request, response);
             return;
@@ -41,53 +48,62 @@ public class SessionInactivityFilter extends OncePerRequestFilter {
         String token = extractToken(request);
 
         if (token != null && !token.isEmpty()) {
+
+            // 2. VERIFICACIÓN DE REVOCACIÓN (Bloquea el "segundo intento" o tokens revocados por nuevo login)
+            if (tokenRevocationService.isRevoked(token)) {
+                // Token ya fue marcado como inactivo o revocado, lo bloqueamos inmediatamente.
+                sendExpiredResponse(response);
+                return;
+            }
+
+            // 3. VERIFICACIÓN DE INACTIVIDAD POR TIEMPO
             LocalDateTime lastAccess = lastAccessMap.get(token);
             LocalDateTime now = LocalDateTime.now();
-            boolean isInactive = false; // Cambiamos el nombre de la variable para ser más claros
+            boolean isInactive = false;
 
-            // 1. Caso: Token conocido (tiene un registro previo de acceso).
             if (lastAccess != null) {
                 Duration duration = Duration.between(lastAccess, now);
 
-                // 2. Verificar Inactividad (HU-03.3)
                 if (duration.toMinutes() >= inactivityMinutes) {
                     isInactive = true;
                 }
             }
-            // 3. Caso: Token NO encontrado.
-            // Si el token no está en el mapa, SOLO lo consideramos inactivo si NO es un nuevo token
-            // (lo cual es difícil de saber aquí). La forma más segura es la que ya implementamos
-            // para bloquear el segundo intento: si se borró, debe seguir borrado.
-            // Para diferenciar un token nuevo de uno borrado, se debería usar Redis o una lista negra
-            // global. Por ahora, nos quedamos con el caso de inactividad por tiempo.
-            // Si el token llega aquí y `lastAccess == null`, simplemente se actualizará el mapa abajo.
 
             if (isInactive) {
                 // Sesión expirada por inactividad
+
+                // Lo removemos del mapa de acceso (para no seguir rastreándolo)
                 lastAccessMap.remove(token);
 
-                SecurityContextHolder.clearContext();
+                // CLAVE: Lo agregamos a la lista negra para bloquear cualquier reintento (segundo intento)
+                tokenRevocationService.revokeToken(token);
 
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
-                response.getWriter().write("{\"error\": \"Su sesión ha expirado por inactividad.\"}");
-                response.setHeader("Location", "/login");
-                return; // Detener la cadena, sin pasar al JwtAuthenticationFilter.
+                sendExpiredResponse(response);
+                return; // Detener la cadena
             }
 
             // 4. Mantener Sesión Activa (Actualizar marca de tiempo).
-            // Si `lastAccess == null`, el token se registrará por primera vez.
+            // Si `lastAccess == null`, el token se registra por primera vez aquí.
             lastAccessMap.put(token, now);
         }
 
         filterChain.doFilter(request, response);
     }
 
-    // Método auxiliar para extraer el JWT (sin cambios)
+    // --- Métodos Auxiliares ---
+
     private String extractToken(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    private void sendExpiredResponse(HttpServletResponse response) throws IOException {
+        SecurityContextHolder.clearContext();
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\": \"Su sesión ha expirado por inactividad.\"}");
     }
 }

@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.transaction.annotation.Propagation;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,6 +115,8 @@ public class AlertRuleService {
         //  Registrar eliminación en auditoría
         registerAudit(rule, AuditAction.DELETE, username, null, "127.0.0.1");
 
+        auditRepository.deleteByAlertRule(rule);
+
         alertRuleRepository.delete(rule);
 
         log.info("Regla de alerta ID {} eliminada exitosamente", id);
@@ -194,7 +198,8 @@ public class AlertRuleService {
     /**
      * Registrar en auditoría
      */
-    private void registerAudit(AlertRule rule, AuditAction action, String username,
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected void registerAudit(AlertRule rule, AuditAction action, String username,
                                String changes, String ipAddress) {
         AlertRuleAudit audit = new AlertRuleAudit();
         audit.setAlertRule(rule);

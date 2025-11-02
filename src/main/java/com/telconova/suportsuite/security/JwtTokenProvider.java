@@ -38,28 +38,27 @@ public class JwtTokenProvider {
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .addClaims(claims)
-                // Usando el método obsoleto pero compatible con versiones antiguas
+                // Usando el metodo obsoleto pero compatible con versiones antiguas
                 .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
 
-    public String getUsernameFromJWT(String token) {
-        Claims claims = Jwts.parser()
-                // ⭐️ CAMBIO: Usamos setSigningKey(String key)
+    // Centraliza la obtención de las Claims.
+    public Claims getClaims(String token) {
+        return Jwts.parser()
                 .setSigningKey(jwtSecret)
                 .parseClaimsJws(token)
                 .getBody();
+    }
 
-        return claims.getSubject();
+    public String getUsernameFromJWT(String token) {
+        // Ahora podemos usar el metodo getClaims para simplificar:
+        return getClaims(token).getSubject();
     }
 
     public long getRemainingTimeInMs(String token) {
         try {
-            Claims claims = Jwts.parser()
-                    // ⭐️ CAMBIO: Usamos setSigningKey(String key)
-                    .setSigningKey(jwtSecret)
-                    .parseClaimsJws(token)
-                    .getBody();
+            Claims claims = getClaims(token);
 
             Date expiration = claims.getExpiration();
             long remaining = expiration.getTime() - new Date().getTime();
@@ -75,7 +74,7 @@ public class JwtTokenProvider {
     public boolean validateToken(String authToken) {
         try {
             Jwts.parser()
-                    // ⭐️ CAMBIO: Usamos setSigningKey(String key)
+                    // Usamos setSigningKey(String key)
                     .setSigningKey(jwtSecret)
                     .parseClaimsJws(authToken);
             return true;

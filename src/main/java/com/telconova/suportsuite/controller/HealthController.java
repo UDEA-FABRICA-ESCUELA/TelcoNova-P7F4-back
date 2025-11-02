@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/health")
 public class HealthController {
 
-    // Inyectamos el UserRepository para acceder al método de verificación.
+    // Inyectamos el UserRepository para acceder al metodo de verificación.
     @Autowired
     private UserRepository userRepository;
 
@@ -23,14 +23,14 @@ public class HealthController {
             userRepository.checkDatabaseConnection();
 
             // Si llega aquí, la conexión fue exitosa
-            return ResponseEntity.ok("✅ Conexión a la BD exitosa. HikariPool funcional.");
+            return ResponseEntity.ok("Conexión a la BD exitosa. HikariPool funcional.");
 
         } catch (Exception e) {
             // Si ocurre un error (ej. FATAL: Max client connections reached)
             // devolvemos un código de error 503 (Service Unavailable)
             System.err.println("Error al intentar obtener conexión para /api/health/db: " + e.getMessage());
 
-            String errorMessage = "❌ Falló la conexión a la BD. Causa: " + e.getMessage();
+            String errorMessage = "Falló la conexión a la BD. Causa: " + e.getMessage();
 
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(errorMessage);

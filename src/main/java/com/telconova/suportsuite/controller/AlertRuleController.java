@@ -102,7 +102,7 @@ public class AlertRuleController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<AlertRuleDto> getRule(@PathVariable Long id) {
-        // Implementar método en el servicio
+        // Implementar metodo en el servicio
         return ResponseEntity.ok(null);
     }
 }

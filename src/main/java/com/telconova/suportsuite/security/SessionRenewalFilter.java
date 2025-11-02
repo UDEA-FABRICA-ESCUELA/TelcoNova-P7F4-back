@@ -1,11 +1,10 @@
 package com.telconova.suportsuite.security;
 
-import com.telconova.suportsuite.entity.User; // Asume que esta es tu entidad User
+import com.telconova.suportsuite.entity.User;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,12 +18,17 @@ import java.io.IOException;
 @Component
 public class SessionRenewalFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JwtTokenProvider tokenProvider;
+    private final JwtTokenProvider tokenProvider;
+    private final TokenRevocationService tokenRevocationService; // Requerido para el Bean en SecurityConfig
 
     // Umbral de Renovación: 5 minutos (300,000 ms).
-    // Si quedan menos de 5 min para expirar, se renueva la sesión.
     private static final long RENEWAL_THRESHOLD_MS = 300000L;
+
+
+    public SessionRenewalFilter(JwtTokenProvider tokenProvider, TokenRevocationService tokenRevocationService) {
+        this.tokenProvider = tokenProvider;
+        this.tokenRevocationService = tokenRevocationService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -35,6 +39,7 @@ public class SessionRenewalFilter extends OncePerRequestFilter {
         // Solo procesar si el usuario ya fue autenticado por JwtAuthenticationFilter
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
 
+            // La línea que fallaba antes ahora usa la variable 'tokenProvider' que NO es null.
             String jwt = tokenProvider.getJwtFromRequest(request);
 
             if (jwt != null) {
@@ -46,7 +51,9 @@ public class SessionRenewalFilter extends OncePerRequestFilter {
 
                     Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-                    // Solo renovar si el principal es una instancia de User
+                    // ⚠NOTA: El principal en Spring Security suele ser un UserDetails, no tu entidad User.
+                    // Si estás seguro de que tu UserDetailsService devuelve la entidad User directamente, está bien.
+                    // Si devuelve un UserDetails de Spring, tendrías que obtener el username y cargarlo de nuevo.
                     if (principal instanceof User) {
 
                         User user = (User) principal;
@@ -55,7 +62,6 @@ public class SessionRenewalFilter extends OncePerRequestFilter {
                         String newJwt = tokenProvider.generateToken(user);
 
                         // Devolver el nuevo token en un encabezado CUSTOM (X-New-Token).
-                        // El frontend es responsable de capturar y reemplazar este nuevo token.
                         response.setHeader("X-New-Token", newJwt);
                         logger.info("Token JWT renovado para el usuario: " + user.getUsername());
                     }
