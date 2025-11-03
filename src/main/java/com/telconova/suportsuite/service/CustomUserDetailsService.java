@@ -32,7 +32,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         Collection<? extends GrantedAuthority> authorities = mapRoleToAuthority(user.getRoles());
 
         // 3. Devolver una instancia de UserDetails (usando la clase User de Spring Security)
-        // Spring Security usará el método getPassword() que devuelve passwordHash de tu entidad
+        // Spring Security usará el metodo getPassword() que devuelve passwordHash de tu entidad
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
@@ -47,10 +47,7 @@ public class CustomUserDetailsService implements UserDetailsService {
      * @return Colección con una SimpleGrantedAuthority.
      */
     private Collection<? extends GrantedAuthority> mapRoleToAuthority(String role) {
-        // La convención de Spring Security es usar el prefijo "ROLE_"
-        SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role.toUpperCase());
-
-        // Devuelve una colección inmutable de un solo elemento
+        SimpleGrantedAuthority authority = new SimpleGrantedAuthority(role.toUpperCase());
         return Collections.singletonList(authority);
     }
 }

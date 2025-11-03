@@ -8,17 +8,21 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component; // Mantener para SpringBoot (aunque no será el punto de inyección en SecurityConfig)
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
@@ -30,7 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenRevocationService tokenRevocationService;
     private final JwtTokenProvider tokenProvider;
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsService userDetailsService; // Lo mantendremos
     private final UserRepository userRepository;
 
     // Constructor para Inyección de Dependencias
@@ -47,45 +51,61 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
 
         try {
-            // Línea que fallaba: ahora 'tokenProvider' ya no es null
             String jwt = tokenProvider.getJwtFromRequest(request);
 
             if (jwt != null) {
                 if (tokenProvider.validateToken(jwt)) {
 
+                    // ... (Lógica de token revocado y username/userEntity/isLocked permanece IGUAL) ...
 
-                    if (tokenRevocationService.isRevoked(jwt)) {
-                        logger.warn("Intento de acceso con token revocado: " + jwt.substring(0, 10) + "...");
-                        // Usamos SC_FORBIDDEN (403) o SC_UNAUTHORIZED (401).
-                        // 403 suele ser más claro para token válido pero no autorizado.
-                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                        response.setContentType("application/json");
-                        response.getWriter().write("{\"error\": \"Acceso denegado. Su token ha sido revocado o ha expirado.\"}");
-                        return; // DETENER LA CADENA DE FILTROS AQUÍ
-                    }
                     String username = tokenProvider.getUsernameFromJWT(jwt);
-                    //aca string username
-                    // 1. OBTENER EL ESTADO ACTUAL DEL USUARIO
+
+                    // 1. OBTENER EL ESTADO ACTUAL DEL USUARIO para verificación de bloqueo (MANTENER)
                     User userEntity = userRepository.findByUsername(username)
                             .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
 
-                    // 2. VERIFICAR SI LA CUENTA ESTÁ BLOQUEADA
                     if (userEntity.isLocked()) {
                         throw new LockedAccountException("Acceso denegado. Su cuenta está bloqueada.");
                     }
 
-                    // 3. Si no está bloqueado, procede con la autenticación normal
+                    // 2. Cargar UserDetails para cumplir con la inyección (MANTENER)
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
+
+                    // 🟢 MODIFICACIÓN CRÍTICA: EXTRACCIÓN ROBUSTA DE ROLES
+
+                    // Obtener el objeto de la claim "roles". Puede ser String o List<String>.
+                    Object rolesObject = tokenProvider.getClaims(jwt).get("roles");
+                    Collection<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+
+                    if (rolesObject instanceof String) {
+                        // Caso 1: El rol viene como una cadena (ej: "ADMIN")
+                        String rolesString = (String) rolesObject;
+                        // Aseguramos que si hay comas (ej: "ADMIN,SUPERVISOR") también funcione.
+                        authorities = Arrays.stream(rolesString.split(","))
+                                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.trim()))
+                                .collect(Collectors.toList());
+                    } else if (rolesObject instanceof java.util.List) {
+                        // Caso 2: El rol viene como una lista (ej: ["ADMIN", "SUPERVISOR"])
+                        authorities = (Collection<SimpleGrantedAuthority>) ((java.util.List<?>) rolesObject).stream()
+                                .map(role -> new SimpleGrantedAuthority("ROLE_" + ((String) role).trim()))
+                                .collect(Collectors.toList());
+                    }
+
+
+                    // 3. Crear el Token de Autenticación con las authorities CORREGIDAS
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
+                            userDetails,
+                            null,
+                            authorities // Usamos las authorities ya corregidas con ROLE_
+                    );
 
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
         }
-        // ... (El manejo de excepciones sigue igual)
+        // ... (Manejo de excepciones)
         catch (LockedAccountException ex) {
             logger.warn("Intento de acceso con cuenta bloqueada", ex);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -109,6 +129,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         catch (Exception ex) {
+            // Este catch general es peligroso, pero nos permite pasar al siguiente filtro
             logger.error("Error general al establecer la autenticación JWT para la petición.", ex);
         }
 

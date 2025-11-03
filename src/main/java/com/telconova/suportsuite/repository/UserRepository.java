@@ -10,7 +10,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Necesario para buscar al usuario por su nombre de usuario en el login
     Optional<User> findByUsername(String username);
 
-    // ⭐️ Nuevo método para verificar la conexión a la base de datos
+    // Nuevo metodo para verificar la conexión a la base de datos
     // Ejecuta una consulta trivial (SELECT 1) para confirmar que el pool
     // de conexiones puede entregar una conexión válida.
     @Query(value = "SELECT 1", nativeQuery = true)

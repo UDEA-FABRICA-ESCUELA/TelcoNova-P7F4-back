@@ -96,6 +96,12 @@ public class AlertRuleController {
         return ResponseEntity.ok(rules);
     }
 
+    @GetMapping("/audit-log")
+    public ResponseEntity<List<AlertRuleAuditDto>> getAuditLog() {
+        // 🟢 DEBE DEVOLVER UNA LISTA VACÍA
+        List<AlertRuleAuditDto> auditLogs = alertRuleService.getAuditLog();
+        return ResponseEntity.ok(auditLogs);
+    }
     /**
      * Obtener regla específica
      * GET /api/v1/alert-rules/{id}

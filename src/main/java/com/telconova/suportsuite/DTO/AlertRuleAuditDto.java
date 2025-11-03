@@ -11,7 +11,7 @@ public class AlertRuleAuditDto {
     private Long id;
     private Long ruleId;
     private String ruleName;
-    private AuditAction action;
+    private String action;
     private String performedBy; //  Quién
     private LocalDateTime timestamp;
     private String changes; // Qué cambió

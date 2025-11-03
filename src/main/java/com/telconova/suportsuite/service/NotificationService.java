@@ -3,12 +3,14 @@ package com.telconova.suportsuite.service;
 import com.telconova.suportsuite.DTO.CreateNotificationRequest;
 import com.telconova.suportsuite.DTO.NotificationDTO;
 import com.telconova.suportsuite.DTO.NotificationStatusDTO;
+import com.telconova.suportsuite.entity.AlertRule; // Importado
 import com.telconova.suportsuite.entity.Notification;
 import com.telconova.suportsuite.entity.NotificationHistory;
-// CORRECCIÓN: Se importa el Enum anidado para usar Notification.NotificationStatus
 import com.telconova.suportsuite.entity.Notification.NotificationStatus;
+import com.telconova.suportsuite.repository.AlertRuleRepository; // Importado
 import com.telconova.suportsuite.repository.NotificationHistoryRepository;
 import com.telconova.suportsuite.repository.NotificationRepository;
+import com.telconova.suportsuite.exception.ResourceNotFoundException; // Asumiendo que esta es tu excepción
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -24,22 +27,25 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationHistoryRepository historyRepository;
+    private final AlertRuleRepository alertRuleRepository; // 🟢 INYECCIÓN AÑADIDA
     private final List<NotificationSender> notificationSenders;
 
 
     @Transactional
     public NotificationDTO createNotification(CreateNotificationRequest request){
-        log.info("Creando nueva notificación para {} ", request.getRecipient());
+        log.info("Creando nueva notificación para {} (Regla ID: {})", request.getRecipient(), request.getAlertRuleId());
+
+        // 1. BUSCAR Y VALIDAR LA REGLA
+        AlertRule alertRule = alertRuleRepository.findById(request.getAlertRuleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Regla de Alerta no encontrada con ID: " + request.getAlertRuleId()));
 
         Notification notification = new Notification();
         notification.setRecipient(request.getRecipient());
         notification.setContent(request.getContent());
-
         notification.setSubject(request.getSubject());
-
         notification.setChannel(request.getChannel());
-
         notification.setPriority(request.getPriority());
+        notification.setAlertRule(alertRule); // 🟢 ASIGNAR LA REGLA (SOLUCIÓN AL ERROR DE CLAVE FORÁNEA)
 
         Notification saved = notificationRepository.save(notification);
 
@@ -65,7 +71,7 @@ public class NotificationService {
         NotificationSender sender = notificationSenders.stream()
                 .filter(s -> s.canSend(notification))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException( // CORREGIDO: RutimeExeption -> RuntimeException
+                .orElseThrow(() -> new RuntimeException(
                         "No hay sender disponible para el canal: " + notification.getChannel()));
 
         // Intentar envío
@@ -113,10 +119,31 @@ public class NotificationService {
     }
 
     public List<Notification> getNotificationsForRetry() {
-        // Llama al nuevo método del repositorio
+        // Llama al nuevo metodo del repositorio
         return notificationRepository.findNotificationsEligibleForRetry();
     }
 
+    public List<NotificationDTO> getErrorLogs() {
+        List<Notification> failedAndRetrying =
+                notificationRepository.findByStatusInOrderByCreatedAtDesc(
+                        List.of(NotificationStatus.FALLIDA, NotificationStatus.REINTENTANDO)
+                );
+
+        // Mapear los resultados al DTO que usará el frontend para la tabla.
+        return failedAndRetrying.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<NotificationDTO> getPendingQueueNotifications(){
+        // Buscamos PENDIENTE y PROCESANDO, ordenado por prioridad
+        List<Notification> queue = notificationRepository.findByStatusInOrderByPriorityAscCreatedAtAsc(
+                List.of(NotificationStatus.PENDIENTE, NotificationStatus.PROCESANDO)
+        );
+        return queue.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
 
     // Reintentar envío y registrar error
     @Transactional
@@ -127,7 +154,7 @@ public class NotificationService {
         if (notification.getReintentosCount() < notification.getMaxReintentos()){
             // CORRECCIÓN: RENTRY no existe. Usamos REINTENTANDO.
             notification.setStatus(NotificationStatus.REINTENTANDO);
-            // Se guarda en el método processNotification.
+            // Se guarda en el metodo processNotification.
 
             // CORRECCIÓN: RETRY no existe. Usamos REINTENTANDO.
             addHistory(notification, NotificationStatus.REINTENTANDO,
@@ -139,7 +166,7 @@ public class NotificationService {
                     notification.getMaxReintentos());
         } else {
             notification.setStatus(NotificationStatus.FALLIDA);
-            // Se guarda en el método processNotification.
+            // Se guarda en el metodo processNotification.
 
             addHistory(notification, NotificationStatus.FALLIDA,
                     "Envío fallido definitivo después de "+ notification.getReintentosCount()+

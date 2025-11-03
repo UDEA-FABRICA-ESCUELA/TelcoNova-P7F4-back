@@ -1,6 +1,7 @@
 package com.telconova.suportsuite.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.telconova.suportsuite.DTO.AlertRuleAuditDto;
 import com.telconova.suportsuite.DTO.AlertRuleDto;
 import com.telconova.suportsuite.DTO.CreateAlertRuleRequest;
 import com.telconova.suportsuite.entity.*;
@@ -40,14 +41,20 @@ public class AlertRuleService {
         MessageTemplate template = templateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new RuntimeException("Template no encontrado"));
 
+        // 🟢 CONVERSIÓN DE STRING A ENUM
+        EventTrigger eventTrigger = EventTrigger.valueOf(request.getEventTrigger());
+        // 🟢 CONVERSIÓN DE STRING A ENUM (Asumiendo que Channel es un enum)
+        NotificationChannel channel = NotificationChannel.valueOf(request.getChannel());
+
+
         // Crear la regla
         AlertRule rule = new AlertRule();
         rule.setName(request.getName());
         rule.setDescription(request.getDescription());
-        rule.setTriggerEvent(request.getEventTrigger());
+        rule.setTriggerEvent(eventTrigger); // 🟢 Usar el enum convertido
         rule.setMessageTemplate(template);
         rule.setTargetAudience(request.getTargetAudience());
-        rule.setChannel(request.getChannel());
+        rule.setChannel(channel); // 🟢 Usar el enum convertido
         rule.setPriority(request.getPriority());
         rule.setIsActive(request.getIsActive());
         rule.setCreatedBy(username);
@@ -79,13 +86,18 @@ public class AlertRuleService {
         MessageTemplate template = templateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new RuntimeException("Template no encontrado"));
 
+        // 🟢 CONVERSIÓN DE STRING A ENUM
+        EventTrigger eventTrigger = EventTrigger.valueOf(request.getEventTrigger());
+        // 🟢 CONVERSIÓN DE STRING A ENUM (Asumiendo que Channel es un enum)
+        NotificationChannel channel = NotificationChannel.valueOf(request.getChannel());
+
         // Actualizar campos
         rule.setName(request.getName());
         rule.setDescription(request.getDescription());
-        rule.setTriggerEvent(request.getEventTrigger());
+        rule.setTriggerEvent(eventTrigger); // 🟢 Usar el enum convertido
         rule.setMessageTemplate(template);
         rule.setTargetAudience(request.getTargetAudience());
-        rule.setChannel(request.getChannel());
+        rule.setChannel(channel); // 🟢 Usar el enum convertido
         rule.setPriority(request.getPriority());
         rule.setIsActive(request.getIsActive());
         rule.setUpdatedBy(username);
@@ -103,7 +115,7 @@ public class AlertRuleService {
     }
 
     /**
-     *  Eliminar regla
+     * Eliminar regla
      */
     @Transactional
     public void deleteAlertRule(Long id, String username) {
@@ -123,7 +135,7 @@ public class AlertRuleService {
     }
 
     /**
-     *  Activar regla sin eliminarla
+     * Activar regla sin eliminarla
      */
     @Transactional
     public AlertRuleDto activateRule(Long id, String username) {
@@ -147,7 +159,7 @@ public class AlertRuleService {
     }
 
     /**
-     *  Desactivar regla sin eliminarla
+     * Desactivar regla sin eliminarla
      */
     @Transactional
     public AlertRuleDto deactivateRule(Long id, String username) {
@@ -195,12 +207,34 @@ public class AlertRuleService {
         return alertRuleRepository.findByTriggerEventAndIsActiveTrue(eventType);
     }
 
+    @Transactional(readOnly = true)
+    public List<AlertRuleAuditDto> getAuditLog() {
+        log.info("Obteniendo registro completo de auditoría de reglas.");
+        // Asumimos que necesitas encontrar el repository.findById(id)
+        return auditRepository.findAllByOrderByTimestampDesc() // ⬅️ Nuevo metodo en el Repository
+                .stream()
+                .map(this::convertToAuditDto)
+                .collect(Collectors.toList());
+    }
+    private AlertRuleAuditDto convertToAuditDto(AlertRuleAudit audit) {
+        AlertRuleAuditDto dto = new AlertRuleAuditDto();
+        dto.setId(audit.getId());
+        dto.setRuleId(audit.getAlertRule().getId()); // ID de la regla afectada
+        dto.setRuleName(audit.getAlertRule().getName()); // Nombre de la regla para el display
+        dto.setAction(audit.getAction().toString());
+        dto.setPerformedBy(audit.getPerformedBy());
+        dto.setTimestamp(audit.getTimestamp());
+        dto.setChanges(audit.getChanges());
+        dto.setIpAddress(audit.getIpAddress());
+        return dto;
+    }
+
     /**
      * Registrar en auditoría
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     protected void registerAudit(AlertRule rule, AuditAction action, String username,
-                               String changes, String ipAddress) {
+                                 String changes, String ipAddress) {
         AlertRuleAudit audit = new AlertRuleAudit();
         audit.setAlertRule(rule);
         audit.setAction(action);
@@ -274,4 +308,3 @@ public class AlertRuleService {
         return dto;
     }
 }
-

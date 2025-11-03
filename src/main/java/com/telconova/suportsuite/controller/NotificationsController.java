@@ -39,4 +39,17 @@ public class NotificationsController {
         return ResponseEntity.ok(stast);
     }
 
+    @GetMapping("/errors")
+    public ResponseEntity<List<NotificationDTO>> getErrorLogs() {
+        // Usamos NotificationDTO porque contiene el mensaje de error y el conteo de reintentos
+        List<NotificationDTO> errorLogs = notificationService.getErrorLogs();
+        return ResponseEntity.ok(errorLogs);
+    }
+
+    @GetMapping("/queue")
+    public ResponseEntity<List<NotificationDTO>> getPendingQueue() {
+        List<NotificationDTO> pendingNotifications = notificationService.getPendingQueueNotifications();
+        return ResponseEntity.ok(pendingNotifications);
+    }
+
 }

@@ -19,4 +19,6 @@ public interface AlertRuleAuditRepository extends JpaRepository<AlertRuleAudit, 
 
     // Obtener auditoría por usuario
     List<AlertRuleAudit> findByPerformedByOrderByTimestampDesc(String performedBy);
+
+    List<AlertRuleAudit> findAllByOrderByTimestampDesc();
 }

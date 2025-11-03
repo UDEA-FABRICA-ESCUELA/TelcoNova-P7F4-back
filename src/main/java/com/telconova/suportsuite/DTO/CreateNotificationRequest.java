@@ -20,6 +20,9 @@ public class CreateNotificationRequest {
     @NotNull (message = "El canal de notificación es obligatorio")
     private NotificationChannel channel;
 
+    @NotNull (message = "La regla de alerta asociada es obligatoria")
+    private Long alertRuleId;
+
     /**
      * Nivel de prioridad para la cola de envíos (HU-004).
      * El valor por defecto '5' se establece como la prioridad más baja (normal)

@@ -2,11 +2,12 @@ package com.telconova.suportsuite.config;
 
 import com.telconova.suportsuite.security.JwtAuthenticationFilter;
 import com.telconova.suportsuite.security.SessionRenewalFilter;
-import com.telconova.suportsuite.security.JwtTokenProvider; // Nueva Importación
-import com.telconova.suportsuite.security.TokenRevocationService; // Nueva Importación
-import com.telconova.suportsuite.repository.UserRepository; // Nueva Importación
+import com.telconova.suportsuite.security.JwtTokenProvider;
+import com.telconova.suportsuite.security.TokenRevocationService;
+import com.telconova.suportsuite.repository.UserRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -14,7 +15,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService; // Nueva Importación
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -42,25 +43,21 @@ public class SecurityConfig {
         return authConfig.getAuthenticationManager();
     }
 
-    // --- BEANS DE FILTROS (SOLUCIÓN AL NULLPOINTER) ---
+    // --- BEANS DE FILTROS ---
 
-    // 1. DEFINIR JwtAuthenticationFilter COMO BEAN
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(
             JwtTokenProvider tokenProvider,
             UserDetailsService userDetailsService,
             UserRepository userRepository,
             TokenRevocationService tokenRevocationService) {
-        // Asumiendo que ahora JwtAuthenticationFilter tiene un constructor con estos 3 argumentos
         return new JwtAuthenticationFilter(tokenProvider, userDetailsService, userRepository, tokenRevocationService);
     }
 
-    // 2. DEFINIR SessionRenewalFilter COMO BEAN
     @Bean
     public SessionRenewalFilter sessionRenewalFilter(
             JwtTokenProvider tokenProvider,
             TokenRevocationService tokenRevocationService) {
-        // Se asume que SessionRenewalFilter necesita estas dependencias
         return new SessionRenewalFilter(tokenProvider, tokenRevocationService);
     }
 
@@ -80,33 +77,36 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Configuración de autorización
+                // Configuración de autorización (MANTENER ES CORRECTA)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register").permitAll()
                         .requestMatchers("/api/health/**").permitAll()
+                        .requestMatchers("/api/v1/alert-rules/**", "/api/v1/templates/**").hasAnyRole("ADMIN", "SUPERVISOR")
+                        .requestMatchers("/api/v1/notifications/**").hasAnyRole("ADMIN", "SUPERVISOR")
                         .anyRequest().authenticated()
                 )
 
-                // 🔗 AÑADIR FILTROS (Usando las instancias Bean inyectadas)
-                // Orden de ejecución: SessionRenewalFilter se ejecuta PRIMERO
-                // Luego JwtAuthenticationFilter
+                // 🟢 MODIFICACIÓN CLAVE DE ORDEN DE FILTROS
 
-                .addFilterAfter(sessionRenewalFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, SessionRenewalFilter.class);
-        // NOTA: El orden .addFilterBefore(A, B) asegura que A va ANTES de B.
-        // Si quieres que JWT vaya ANTES de SessionRenewal, invierte el orden de addFilterBefore:
-        // .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-        // .addFilterBefore(sessionRenewalFilter, jwtAuthenticationFilter.class);
+                // 1. Añadimos el JwtAuthenticationFilter DESPUÉS del filtro de persistencia de contexto
+                //    (SecurityContextHolderFilter o su predecesor), lo cual se hace colocándolo
+                //    ANTES del filtro de Autenticación de Spring.
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // 2. Reinsertamos el SessionRenewalFilter después del filtro JWT.
+                //    Si el filtro JWT funciona, este debería funcionar.
+                .addFilterAfter(sessionRenewalFilter, JwtAuthenticationFilter.class);
+
 
         return http.build();
     }
 
 
-    // --- CONFIGURACIÓN CORS ---
+    // --- CONFIGURACIÓN CORS (SIN CAMBIOS - ES CORRECTA) ---
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        // ... (El código CORS se mantiene exactamente igual)
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(
                 "https://telco-nova-p7-f4-front.vercel.app",

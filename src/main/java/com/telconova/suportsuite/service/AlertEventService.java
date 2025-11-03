@@ -21,7 +21,7 @@ public class AlertEventService {
     private final ObjectMapper objectMapper;
 
     /**
-     * Este método se llama cuando ocurre un evento en el sistema
+     * Este metodo se llama cuando ocurre un evento en el sistema
      * Evalúa las reglas y genera notificaciones automáticas
      */
     public void processEvent(EventTrigger eventType, Map<String, Object> eventData) {
