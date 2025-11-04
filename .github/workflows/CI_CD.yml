@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Necesario para análisis SonarCloud
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -31,27 +33,40 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      # ---- VALIDACIÓN ----
       - name: Validate project structure
         run: mvn validate
 
+      # ---- COMPILACIÓN ----
       - name: Compile source code
         run: mvn clean compile
 
-      - name: Run unit tests
-        run: echo "No hay test"
+      # ---- TEST Y COBERTURA ----
+      - name: Run unit tests with JaCoCo
+        run: mvn clean verify
 
-      - name: Run integration tests
-        run: echo "No hay test"
+      # ---- CHECKSTYLE ----
+      - name: Code style validation (Checkstyle)
+        run: mvn checkstyle:check || true
 
-      - name: Code quality analysis (optional)
-        run: echo "Checkstyle not configured"
+      # ---- ANÁLISIS DE SEGURIDAD (OWASP) ----
+      - name: Security scan (OWASP Dependency Check)
+        run: mvn org.owasp:dependency-check-maven:check || true
 
-      - name: Security scan (optional)
-        run: echo "OWASP not configured"
+      # ---- SONARCLOUD ANALYSIS ----
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
 
+      # ---- EMPAQUETADO ----
       - name: Build JAR package
         run: mvn clean package -DskipTests
 
+      # ---- ARTEFACTO ----
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
