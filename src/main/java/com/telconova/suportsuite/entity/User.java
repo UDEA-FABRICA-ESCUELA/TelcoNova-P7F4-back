@@ -22,7 +22,6 @@ public class User {
     public String getPassword() {
         return passwordHash;
     }
-    public void setPasswordHash(String passwordHash) {}
 
     // Campos para HU-03.2: Bloqueo por fallos
     @Column(name = "is_locked")
