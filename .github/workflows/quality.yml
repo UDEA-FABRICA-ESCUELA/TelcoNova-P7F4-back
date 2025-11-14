@@ -43,8 +43,6 @@ jobs:
           name: jacoco-report
           path: target/site/jacoco/
 
-      - name: Set sonar.java.libraries
-        run: echo "sonar.java.libraries=~/.m2/repository" >> sonar-project.properties
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
@@ -55,7 +53,6 @@ jobs:
           args: >
             -Dsonar.sources=src/main/java
             -Dsonar.tests=.
-            -Dsonar.java.libraries=/home/runner/.m2/repository
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
             -Dsonar.test.inclusions=**/*Test.java
             -Dsonar.java.binaries=target/classes
