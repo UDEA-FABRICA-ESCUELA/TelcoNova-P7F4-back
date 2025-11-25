@@ -7,6 +7,8 @@ import lombok.Data;
 // import org.springframework.cglib.core.Local;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Data
@@ -34,11 +36,11 @@ public class NotificationHistory {
 
     private String errorDetails;
 
-    @Column (name = "timestamp", nullable = false)
-    private LocalDateTime timestamp;
+    @Column(name = "timestamp", nullable = false)
+    private OffsetDateTime timestamp;
 
     @PrePersist
-    protected void onCreate(){
-        timestamp = LocalDateTime.now();
+    protected void onCreate() {
+        timestamp = OffsetDateTime.now(ZoneId.of("America/Bogota"));
     }
 }
