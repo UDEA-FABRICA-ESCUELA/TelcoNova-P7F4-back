@@ -54,3 +54,4 @@ class TicketServiceTest {
                 .processEvent(eq(EventTrigger.TICKET_ASSIGNED), any(Map.class));
     }
 }
+
