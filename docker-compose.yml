@@ -1,0 +1,52 @@
+version: '3.8'
+services:
+  # 1. Servicio de la Aplicación Spring Boot
+  supportsuite-backend:
+    container_name: supportsuite-backend
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # ... (Tus variables de entorno para DB y JWT)
+      # Las variables de entorno inyectadas en el contenedor:
+      SPRING_DATASOURCE_URL: ${DB_URL}             # Corregido
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}       # Corregido
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASS}       # Corregido
+      JWT_SECRET: ${JWT_SECRET}                    # Corregido
+      # Habilitar el endpoint de Actuator para que Prometheus pueda acceder a las métricas
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: 'prometheus'
+      MANAGEMENT_SERVER_PORT: 8080 # Asegúrate de que Actuator use el puerto principal
+
+  # 2. Servicio de Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      # Mapea el archivo de configuración local al contenedor
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      # Usa un comando explícito para cargar la configuración
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - supportsuite-backend
+    restart: unless-stopped
+
+  # 3. Servicio de Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    # El volumen es opcional, pero mantiene la configuración y los dashboards
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+# Volúmenes para persistir datos de Grafana
+volumes:
+  grafana-storage:

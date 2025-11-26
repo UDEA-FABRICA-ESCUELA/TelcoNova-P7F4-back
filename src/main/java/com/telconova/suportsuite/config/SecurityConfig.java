@@ -82,6 +82,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register").permitAll()
                         .requestMatchers("/api/health/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/prometheus", "/error").permitAll()
                         .requestMatchers("/api/v1/alert-rules/**", "/api/v1/templates/**").hasAnyRole("ADMIN", "SUPERVISOR")
                         .requestMatchers("/api/v1/notifications/**").hasAnyRole("ADMIN", "SUPERVISOR")
                         .anyRequest().authenticated()
